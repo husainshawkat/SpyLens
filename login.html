@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:      #0a0a0a;
+      --surface: #111111;
+      --border:  #222222;
+      --accent:  #e8ff4a;
+      --text:    #ececec;
+      --muted:   #555;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Subtle noise overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    .card {
+      position: relative; z-index: 1;
+      width: min(360px, 92vw);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+    }
+
+    .logo {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      letter-spacing: 0.05em;
+    }
+
+    label {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.85rem;
+      padding: 0.7rem 0.85rem;
+      margin-bottom: 1.2rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.85rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-top: 0.4rem;
+    }
+
+    button:hover:not(:disabled) { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .error {
+      font-size: 0.7rem;
+      color: #ff5555;
+      margin-top: 1rem;
+      letter-spacing: 0.05em;
+      min-height: 1rem;
+    }
+
+    .corner {
+      position: fixed;
+      bottom: 1.2rem; right: 1.4rem;
+      font-size: 0.6rem;
+      color: #222;
+      letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">System // Access Control</div>
+    <h1>Admin Login</h1>
+    <p class="sub">Authenticated personnel only</p>
+
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="admin@domain.com" autocomplete="email" />
+
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="••••••••••••" autocomplete="current-password" />
+
+    <button id="loginBtn">Sign In</button>
+    <div class="error" id="errMsg"></div>
+  </div>
+
+  <div class="corner">v1.0.0</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ─── CONFIG ───────────────────────────────────────────────────────────────
+    const SUPABASE_URL     = 'https://iircapwzzcnasurodkwv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpcmNhcHd6emNuYXN1cm9ka3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTU5MTIsImV4cCI6MjA5NTMzMTkxMn0.3wVMc8Xqp35yrRCV7Kocg7h_JITCPSqOcUFMs9B0us4';
+
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Redirect if already logged in
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) window.location.href = 'admin.html';
+    })();
+
+    // ─── LOGIN ────────────────────────────────────────────────────────────────
+    const loginBtn = document.getElementById('loginBtn');
+    const errMsg   = document.getElementById('errMsg');
+
+    async function doLogin() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      errMsg.textContent = '';
+
+      if (!email || !password) {
+        errMsg.textContent = 'Please enter email and password.';
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in...';
+
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        errMsg.textContent = error.message;
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+      } else {
+        window.location.href = 'admin.html';
+      }
+    }
+
+    loginBtn.addEventListener('click', doLogin);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+  </script>
+</body>
+</html>
