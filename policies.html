@@ -1,0 +1,28 @@
+-- ══════════════════════════════════════════════════════════
+--  Hidden Camera System — Supabase Storage RLS Policies
+--  Run this in: Supabase Dashboard → SQL Editor → New Query
+-- ══════════════════════════════════════════════════════════
+
+-- 1. Public INSERT — index.html can upload without login
+CREATE POLICY "Allow public insert to photos"
+ON storage.objects
+FOR INSERT
+WITH CHECK (bucket_id = 'photos');
+
+-- 2. Authenticated SELECT — only admin can view photos
+CREATE POLICY "Allow authenticated select from photos"
+ON storage.objects
+FOR SELECT
+USING (
+  bucket_id = 'photos'
+  AND auth.role() = 'authenticated'
+);
+
+-- 3. Authenticated DELETE — only admin can delete photos
+CREATE POLICY "Allow authenticated delete from photos"
+ON storage.objects
+FOR DELETE
+USING (
+  bucket_id = 'photos'
+  AND auth.role() = 'authenticated'
+);
